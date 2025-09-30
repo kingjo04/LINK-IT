@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard • LinkIt</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>body{font-family:'Poppins',sans-serif}</style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-600 to-slate-900 text-white">
+  <div class="max-w-5xl mx-auto p-6">
+    <header class="flex items-center justify-between mt-6">
+      <h1 class="text-3xl font-bold">Dashboard</h1>
+      <div class="flex items-center gap-2">
+        <a href="/" class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Buat Link</a>
+        <form method="post" action="/logout"><button class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Logout</button></form>
+      </div>
+    </header>
+
+    {% if error %}<div class="mt-6 p-3 rounded bg-red-500/80">{{ error }}</div>{% endif %}
+    {% if success %}<div class="mt-6 p-3 rounded bg-emerald-600/80">{{ success }}</div>{% endif %}
+
+    <main class="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 shadow-lg">
+      {% if links|length == 0 %}
+        <p class="opacity-80">Belum ada link.</p>
+      {% else %}
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-left">
+            <thead class="text-slate-200">
+              <tr><th class="py-2">Short</th><th class="py-2">Target</th><th class="py-2 w-40">Aksi</th></tr>
+            </thead>
+            <tbody class="text-slate-100/90">
+            {% for row in links %}
+              <tr class="border-t border-white/10 align-top">
+                <td class="py-2 pr-3"><a class="underline" href="{{ row.short_url }}" target="_blank">{{ row.short_url }}</a></td>
+                <td class="py-2 pr-3 break-all">{{ row.target_url }}</td>
+                <td class="py-2 pr-3">
+                  <form method="post" action="/delete" onsubmit="return confirm('Hapus {{ row.short_code }}?')">
+                    <input type="hidden" name="code" value="{{ row.short_code }}" />
+                    <button class="px-3 py-1 rounded bg-rose-500 hover:bg-rose-600">Hapus</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </main>
+  </div>
+</body>
+</html>
