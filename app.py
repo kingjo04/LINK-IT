@@ -1,24 +1,19 @@
 
-from flask import Flask, request, redirect, render_template, url_for, make_response, jsonify
+from flask import Flask, request, redirect, render_template, url_for, make_response
 from urllib.parse import urlparse
 import string, random, re, os, logging, time, hmac, hashlib, base64
 from datetime import datetime, timezone
 from supabase import create_client, Client
 
-# ======================================================
-# ENV VARS (Vercel → Project Settings → Environment Variables)
-#   - SUPABASE_URL
-#   - SUPABASE_KEY   (service_role disarankan)
-# ======================================================
+# ================= ENV =================
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()  # service_role recommended
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Set SUPABASE_URL dan SUPABASE_KEY di Environment Variables.")
 
 TABLE_USERS = "users"
 TABLE_LINKS = "links"
 
-# Cookie token ditandatangani dengan SUPABASE_KEY (tidak ada secret tambahan)
 TOKEN_COOKIE = "auth"
 TOKEN_AGE_SECONDS = 7 * 24 * 3600  # 7 hari
 
@@ -26,6 +21,7 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 logging.basicConfig(level=logging.INFO)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ============= Helpers =============
 def now_utc():
     return datetime.now(timezone.utc)
 
@@ -50,7 +46,7 @@ def random_code(n: int = 6) -> str:
     chars = string.ascii_letters + string.digits
     return "".join(random.choice(chars) for _ in range(n))
 
-# ========== Token (HMAC dengan SUPABASE_KEY) ==========
+# ========== Token (HMAC with SUPABASE_KEY) ==========
 def sign_token(user_id: int, username: str, exp_ts: int) -> str:
     msg = f"{user_id}|{username}|{exp_ts}".encode()
     sig = hmac.new(SUPABASE_KEY.encode(), msg, hashlib.sha256).digest()
@@ -66,7 +62,6 @@ def parse_token(token: str):
         username = parts[1]
         exp_ts = int(parts[2])
         sig = parts[3]
-
         msg = f"{user_id}|{username}|{exp_ts}".encode()
         expected = base64.urlsafe_b64encode(hmac.new(SUPABASE_KEY.encode(), msg, hashlib.sha256).digest()).decode().rstrip("=")
         if not hmac.compare_digest(sig, expected):
@@ -81,19 +76,10 @@ def current_user():
     tok = request.cookies.get(TOKEN_COOKIE)
     return parse_token(tok) if tok else None
 
-def require_login():
-    u = current_user()
-    if u is None:
-        return redirect(url_for("login", next=request.path))
-    return None
-
 def set_auth_cookie(resp, user_id, username):
     exp = int(time.time()) + TOKEN_AGE_SECONDS
     tok = sign_token(user_id, username, exp)
-    resp.set_cookie(
-        TOKEN_COOKIE, tok, max_age=TOKEN_AGE_SECONDS,
-        httponly=True, samesite="Lax", secure=True
-    )
+    resp.set_cookie(TOKEN_COOKIE, tok, max_age=TOKEN_AGE_SECONDS, httponly=True, samesite="Lax", secure=True)
     return resp
 
 def clear_auth_cookie(resp):
@@ -109,9 +95,9 @@ def code_exists(code: str) -> bool:
         logging.error(f"code_exists error: {e}")
         return True
 
-def create_link(owner_id: int, short_code: str, target_url: str):
+def create_link(owner_id, short_code: str, target_url: str):
     payload = {
-        "owner_id": owner_id,
+        "owner_id": owner_id,  # can be None for public
         "short_code": short_code,
         "target_url": target_url,
         "created_at": now_utc().isoformat()
@@ -133,10 +119,7 @@ def index():
 
 @app.route("/shorten", methods=["POST"])
 def shorten():
-    guard = require_login()
-    if guard is not None:
-        return guard
-    user = current_user()
+    user = current_user()  # can be None (public)
     url = ensure_scheme((request.form.get("url") or "").strip())
     custom = (request.form.get("custom_code") or "").strip()
     if not is_valid_url(url):
@@ -156,7 +139,8 @@ def shorten():
         else:
             return render_template("index.html", user=user, error="Gagal membuat kode unik.", result=None)
     try:
-        create_link(user["id"], chosen, url)
+        owner = user["id"] if user else None
+        create_link(owner, chosen, url)
         base = request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "localhost"
         short_url = f"https://{base}/{chosen}"
         return render_template("index.html", user=user, result=short_url, error=None)
@@ -166,10 +150,10 @@ def shorten():
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
-    guard = require_login()
-    if guard is not None:
-        return guard
     user = current_user()
+    if not user:
+        # guest: no personal links
+        return render_template("dashboard.html", user=None, links=[], error="Login untuk melihat link milikmu.", success=None)
     try:
         rows = list_links(user["id"])
         base = request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "localhost"
@@ -182,10 +166,9 @@ def dashboard():
 
 @app.route("/delete", methods=["POST"])
 def delete():
-    guard = require_login()
-    if guard is not None:
-        return guard
     user = current_user()
+    if not user:
+        return redirect(url_for("login", next="/dashboard"))
     code = (request.form.get("code") or "").strip()
     if not code:
         return redirect(url_for("dashboard"))
@@ -196,26 +179,51 @@ def delete():
         logging.exception("delete error")
         return redirect(url_for("dashboard"))
 
-# ========== Auth (tanpa hash; password disimpan plaintext) ==========
+# ========== Auth: login & register (plaintext password) ==========
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        return render_template("login.html", error=None, next=request.args.get("next", "/"))
+        return render_template("login.html", mode="login", error=None, next=request.args.get("next", "/"))
     username = (request.form.get("username") or "").strip()
     password = (request.form.get("password") or "").strip()
     next_url = request.form.get("next") or "/"
     if not username or not password:
-        return render_template("login.html", error="Isi username & password", next=next_url)
+        return render_template("login.html", mode="login", error="Isi username & password", next=next_url)
     try:
         r = supabase.table(TABLE_USERS).select("id, username, password").eq("username", username).limit(1).execute()
         if not r.data or (r.data[0].get("password") or "") != password:
-            return render_template("login.html", error="Username atau password salah", next=next_url)
+            return render_template("login.html", mode="login", error="Username atau password salah", next=next_url)
         row = r.data[0]
         resp = make_response(redirect(next_url))
         return set_auth_cookie(resp, row["id"], row["username"])
     except Exception as e:
         logging.exception("login error")
-        return render_template("login.html", error=f"Gagal login: {e}", next=next_url)
+        return render_template("login.html", mode="login", error=f"Gagal login: {e}", next=next_url)
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "GET":
+        return render_template("login.html", mode="register", error=None, next=request.args.get("next", "/"))
+    username = (request.form.get("username") or "").strip()
+    password = (request.form.get("password") or "").strip()
+    next_url = request.form.get("next") or "/"
+    if not username or not password:
+        return render_template("login.html", mode="register", error="Isi username & password", next=next_url)
+    try:
+        # cek apakah sudah ada
+        r = supabase.table(TABLE_USERS).select("id").eq("username", username).limit(1).execute()
+        if r.data:
+            return render_template("login.html", mode="register", error="Username sudah dipakai", next=next_url)
+        # simpan plaintext sesuai permintaan
+        supabase.table(TABLE_USERS).insert({"username": username, "password": password}).execute()
+        # ambil id lalu auto login
+        r2 = supabase.table(TABLE_USERS).select("id, username").eq("username", username).limit(1).execute()
+        row = r2.data[0]
+        resp = make_response(redirect(next_url))
+        return set_auth_cookie(resp, row["id"], row["username"])
+    except Exception as e:
+        logging.exception("register error")
+        return render_template("login.html", mode="register", error=f"Gagal daftar: {e}", next=next_url)
 
 @app.route("/logout", methods=["POST"])
 def logout():

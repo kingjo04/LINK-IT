@@ -5,24 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dashboard • LinkIt</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>body{font-family:'Poppins',sans-serif}</style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-600 to-slate-900 text-white">
+<body class="min-h-screen bg-gradient-to-br from-slate-700 to-slate-900 text-white">
   <div class="max-w-5xl mx-auto p-6">
     <header class="flex items-center justify-between mt-6">
       <h1 class="text-3xl font-bold">Dashboard</h1>
       <div class="flex items-center gap-2">
         <a href="/" class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Buat Link</a>
-        <form method="post" action="/logout"><button class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Logout</button></form>
+        {% if user %}<form method="post" action="/logout"><button class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Logout</button></form>{% endif %}
       </div>
     </header>
 
-    {% if error %}<div class="mt-6 p-3 rounded bg-red-500/80">{{ error }}</div>{% endif %}
-    {% if success %}<div class="mt-6 p-3 rounded bg-emerald-600/80">{{ success }}</div>{% endif %}
+    {% if error %}<div class="mt-6 p-3 rounded bg-yellow-600/80">{{ error }}</div>{% endif %}
 
     <main class="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 shadow-lg">
-      {% if links|length == 0 %}
+      {% if not user %}
+        <p class="opacity-80">Kamu belum login. <a class="underline" href="/login">Login</a> untuk melihat link milikmu.</p>
+      {% elif links|length == 0 %}
         <p class="opacity-80">Belum ada link.</p>
       {% else %}
         <div class="overflow-x-auto">

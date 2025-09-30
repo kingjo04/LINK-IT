@@ -5,23 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LinkIt • URL Shortener</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, 'Helvetica Neue', Arial}</style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-600 to-slate-900 text-white">
+<body class="min-h-screen bg-gradient-to-br from-slate-700 to-slate-900 text-white">
   <div class="max-w-3xl mx-auto p-6">
     <header class="flex items-center justify-between mt-10">
       <div>
         <h1 class="text-4xl font-bold">LinkIt</h1>
-        <p class="text-slate-200 mt-2">Shorten links — simple users</p>
+        <p class="text-slate-200 mt-2">Shorten links — login opsional</p>
       </div>
-      {% if user %}
-        <form method="post" action="/logout"><button class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Logout ({{ user.username }})</button></form>
-      {% else %}
-        <a href="/login" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600">Login</a>
-      {% endif %}
+      <div class="flex gap-2">
+        {% if user %}
+          <form method="post" action="/logout"><button class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Logout ({{ user.username }})</button></form>
+          <a href="/dashboard" class="px-4 py-2 rounded-xl bg-slate-500 hover:bg-slate-600">Dashboard</a>
+        {% else %}
+          <a href="/login" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700">Login</a>
+          <a href="/register" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700">Register</a>
+        {% endif %}
+      </div>
     </header>
 
     <main class="mt-10 bg-white/10 backdrop-blur rounded-2xl p-6 shadow-lg">
-      {% if not user %}<div class="mb-4 p-3 rounded bg-yellow-500/80">Login dulu untuk menyimpan link ke akunmu.</div>{% endif %}
       {% if error %}<div class="mb-4 p-3 rounded bg-red-500/80">{{ error }}</div>{% endif %}
       {% if result %}<div class="mb-4 p-3 rounded bg-emerald-600/80">Short URL: <a class="underline" href="{{ result }}">{{ result }}</a></div>{% endif %}
 
@@ -39,6 +43,9 @@
           <button class="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 font-semibold">Shorten</button>
           <a href="/dashboard" class="px-5 py-3 rounded-xl bg-slate-500 hover:bg-slate-600">Dashboard</a>
         </div>
+        {% if not user %}
+          <p class="text-sm text-slate-300">Kamu belum login. Link tetap bisa dibuat, tapi tidak muncul di dashboard. <a class="underline" href="/register">Buat akun</a> untuk menyimpan riwayat.</p>
+        {% endif %}
       </form>
     </main>
   </div>

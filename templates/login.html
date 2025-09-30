@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login • LinkIt</title>
+  <title>{% if mode=='register' %}Register{% else %}Login{% endif %} • LinkIt</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen grid place-items-center bg-slate-900 text-white">
   <form method="post" class="bg-white/10 backdrop-blur rounded-2xl p-6 w-[380px]">
-    <h1 class="text-2xl font-semibold mb-4">Login</h1>
+    <h1 class="text-2xl font-semibold mb-4">{% if mode=='register' %}Register{% else %}Login{% endif %}</h1>
     {% if error %}<div class="mb-3 p-2 rounded bg-red-500/80">{{ error }}</div>{% endif %}
     <input type="hidden" name="next" value="{{ next }}"/>
     <div class="space-y-3">
@@ -20,7 +20,16 @@
         <label class="block mb-1">Password</label>
         <input name="password" type="password" required class="w-full rounded p-3 text-black"/>
       </div>
-      <button class="w-full mt-2 px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700">Masuk</button>
+      <button class="w-full mt-2 px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700">
+        {% if mode=='register' %}Daftar{% else %}Masuk{% endif %}
+      </button>
+    </div>
+    <div class="mt-4 text-sm opacity-80">
+      {% if mode=='register' %}
+        Sudah punya akun? <a href="/login" class="underline">Login</a>
+      {% else %}
+        Belum punya akun? <a href="/register" class="underline">Register</a>
+      {% endif %}
     </div>
   </form>
 </body>
